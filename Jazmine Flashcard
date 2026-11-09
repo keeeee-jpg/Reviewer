@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flashcard Reviewer System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts (Inter & JetBrains Mono) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            industrial: {
+              900: '#0F1115',
+              800: '#161920',
+              700: '#212631',
+              600: '#2D3444',
+              500: '#404B61',
+              400: '#64748B',
+              accent: '#3B82F6',
+              warning: '#F59E0B',
+              success: '#10B981',
+              danger: '#EF4444'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom 3D Card Flip CSS */
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    .transform-style-3d {
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .backface-hidden {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .rotate-y-180 {
+      transform: rotateY(180deg);
+    }
+    
+    /* Custom Scrollbar for Industrial Feel */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0F1115;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #212631;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3B82F6;
+    }
+  </style>
+</head>
+<body class="bg-industrial-900 text-slate-200 font-sans min-h-screen flex flex-col justify-between selection:bg-industrial-accent selection:text-white antialiased">
+
+  <!-- TOP NAVIGATION / HEADER -->
+  <header class="border-b border-industrial-700/60 bg-industrial-800/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Logo & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-industrial-accent/10 border border-industrial-accent/30 flex items-center justify-center text-industrial-accent shadow-inner">
+          <i class="fa-solid font-mono font-bold text-lg"><i class="fa-solid fa-layer-group"></i></i>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            CORE REVIEWER
+            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-industrial-700 text-slate-300 border border-industrial-600">Pro</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Oral Flashcard System • Powered by Google Sheets</p>
+        </div>
+      </div>
+
+      <!-- Action Tools -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Source Badge -->
+        <div id="sourceIndicator" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono bg-industrial-900 border border-industrial-700 text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="sourceLabel">Demo Deck</span>
+        </div>
+
+        <!-- Add / Manage Cards Button -->
+        <button onclick="openCardManagerModal()" title="Add or Edit Cards" class="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-emerald-500/10 transition duration-150">
+          <i class="fa-solid fa-plus-circle"></i>
+          <span class="hidden sm:inline">Manage Cards</span>
+        </button>
+
+        <!-- System Sync Button -->
+        <button id="syncBtn" onclick="fetchDeckData()" title="Sync with Google Sheets" class="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-industrial-700 hover:bg-industrial-600 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-industrial-600 transition duration-150">
+          <i class="fa-solid fa-rotate-right" id="syncIcon"></i>
+          <span class="hidden sm:inline">Sync Sheet</span>
+        </button>
+
+        <!-- Settings Modal Toggle Button -->
+        <button onclick="openSettingsModal()" title="Config & Script Guide" class="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-industrial-accent hover:bg-blue-600 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-blue-500/10 transition duration-150">
+          <i class="fa-solid fa-sliders"></i>
+          <span class="hidden sm:inline">Settings</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN MAIN DASHBOARD & FLASHCARD CONTAINER -->
+  <main class="max-w-4xl w-full mx-auto px-4 py-6 sm:py-8 flex-1 flex flex-col justify-center">
+
+    <!-- CONTROLS & MODES TOOLBAR -->
+    <div class="bg-industrial-800/90 border border-industrial-700/80 rounded-xl p-3 sm:p-4 mb-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+      
+      <!-- Mode Selection Segmented Control -->
+      <div class="w-full md:w-auto flex items-center bg-industrial-900/90 p-1 rounded-lg border border-industrial-700">
+        <button id="modeTermFirstBtn" onclick="setStudyMode('term-first')" class="flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-medium transition duration-150 bg-industrial-accent text-white shadow">
+          <i class="fa-solid fa-font mr-1.5"></i> Show Term First
+        </button>
+        <button id="modeDefFirstBtn" onclick="setStudyMode('def-first')" class="flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-medium transition duration-150 text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-align-left mr-1.5"></i> Show Def/Details First
+        </button>
+      </div>
+
+      <!-- Quick Deck Stats & Controls -->
+      <div class="w-full md:w-auto flex items-center justify-between md:justify-end gap-3 text-xs font-mono">
+        <button onclick="shuffleDeck()" class="px-3 py-1.5 rounded-lg bg-industrial-700 hover:bg-industrial-600 text-slate-300 border border-industrial-600 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-shuffle text-slate-400"></i> Shuffle
+        </button>
+        
+        <button onclick="resetStats()" class="px-3 py-1.5 rounded-lg bg-industrial-700 hover:bg-industrial-600 text-slate-300 border border-industrial-600 flex items-center gap-1.5 transition" title="Reset stats">
+          <i class="fa-solid fa-arrow-rotate-left text-slate-400"></i> Reset
+        </button>
+
+        <div class="h-4 w-[1px] bg-industrial-700"></div>
+
+        <div class="text-slate-400">
+          Card <span id="currentCardIndex" class="text-white font-bold">1</span> of <span id="totalCardsCount" class="text-white font-bold">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS BAR -->
+    <div class="w-full bg-industrial-800 rounded-full h-1.5 mb-6 border border-industrial-700/50 overflow-hidden">
+      <div id="progressBar" class="bg-industrial-accent h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+    </div>
+
+    <!-- 3D FLASHCARD DISPLAY AREA -->
+    <div class="relative w-full h-[360px] sm:h-[420px] perspective-1000 group">
+      
+      <div id="flashcard" class="w-full h-full relative transform-style-3d cursor-pointer rounded-2xl shadow-2xl transition-transform" onclick="flipCard()">
+        
+        <!-- CARD FRONT -->
+        <div class="absolute inset-0 w-full h-full rounded-2xl bg-gradient-to-br from-industrial-800 to-industrial-900 border border-industrial-700 p-6 sm:p-8 flex flex-col justify-between backface-hidden shadow-inner">
+          <!-- Top Info Bar -->
+          <div class="flex items-center justify-between">
+            <span id="frontCategoryBadge" class="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold tracking-wider uppercase bg-industrial-700 text-slate-300 border border-industrial-600">
+              CATEGORY
+            </span>
+            <span class="text-xs text-slate-500 font-mono flex items-center gap-1">
+              <i class="fa-regular fa-eye"></i> Oral Review Mode
+            </span>
+          </div>
+
+          <!-- Main Content Area -->
+          <div class="my-auto text-center px-2 sm:px-6">
+            <h2 id="cardFrontText" class="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-relaxed select-none">
+              Loading Flashcards...
+            </h2>
+            <p id="cardFrontSubtext" class="mt-3 text-xs sm:text-sm text-slate-400 italic hidden">
+              <!-- Optional additional context or prompt hint -->
+            </p>
+          </div>
+
+          <!-- Bottom Prompt Bar -->
+          <div class="flex items-center justify-between text-xs text-slate-500 font-mono">
+            <span>Recite answer out loud</span>
+            <span class="flex items-center gap-1 text-industrial-accent group-hover:translate-x-0.5 transition">
+              Click or Press Space to Flip <i class="fa-solid fa-rotate"></i>
+            </span>
+          </div>
+        </div>
+
+        <!-- CARD BACK -->
+        <div class="absolute inset-0 w-full h-full rounded-2xl bg-gradient-to-br from-industrial-800 to-industrial-800 border-2 border-industrial-accent/50 p-6 sm:p-8 flex flex-col justify-between backface-hidden rotate-y-180 shadow-inner">
+          <!-- Top Info Bar -->
+          <div class="flex items-center justify-between">
+            <span id="backCategoryBadge" class="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold tracking-wider uppercase bg-industrial-accent/20 text-industrial-accent border border-industrial-accent/30">
+              ANSWER / DETAILS
+            </span>
+            <span class="text-xs text-emerald-400 font-mono flex items-center gap-1">
+              <i class="fa-solid fa-check-circle"></i> Revealed
+            </span>
+          </div>
+
+          <!-- Main Content Area -->
+          <div class="my-auto text-center px-2 sm:px-6 overflow-y-auto max-h-[220px] sm:max-h-[260px] custom-scrollbar">
+            <h3 id="cardBackTitle" class="text-lg sm:text-2xl font-bold text-white mb-2">
+              --
+            </h3>
+            <p id="cardBackDescription" class="text-sm sm:text-base text-slate-300 leading-relaxed font-sans">
+              --
+            </p>
+            <!-- Extra info/characteristics block -->
+            <div id="cardBackExtra" class="mt-4 p-3 bg-industrial-900/80 rounded-lg border border-industrial-700/60 text-xs text-slate-400 text-left font-mono hidden">
+              <!-- Dynamic extra parameters parsed from backend -->
+            </div>
+          </div>
+
+          <!-- Bottom Prompt Bar -->
+          <div class="flex items-center justify-between text-xs text-slate-500 font-mono border-t border-industrial-700/50 pt-3">
+            <span>Self Assess Below</span>
+            <span class="text-slate-400">
+              Flip back <i class="fa-solid fa-rotate"></i>
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MAIN NAVIGATION AND SCORING CONTROLS -->
+    <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      
+      <!-- Card Nav Previous Button -->
+      <button onclick="prevCard()" class="w-full sm:w-auto px-5 py-3 rounded-xl bg-industrial-800 hover:bg-industrial-700 text-slate-200 font-semibold border border-industrial-700 flex items-center justify-center gap-2 transition active:scale-95 shadow-md">
+        <i class="fa-solid fa-chevron-left"></i> Previous
+      </button>
+
+      <!-- Center Action: FLIP BUTTON -->
+      <button onclick="flipCard()" class="w-full sm:w-1/3 py-3.5 rounded-xl bg-gradient-to-r from-industrial-accent to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-bold tracking-wide shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition transform active:scale-95">
+        <i class="fa-solid fa-arrows-rotate"></i> FLIP CARD
+      </button>
+
+      <!-- Card Nav Next Button -->
+      <button onclick="nextCard()" class="w-full sm:w-auto px-5 py-3 rounded-xl bg-industrial-800 hover:bg-industrial-700 text-slate-200 font-semibold border border-industrial-700 flex items-center justify-center gap-2 transition active:scale-95 shadow-md">
+        Next <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+
+    <!-- SELF-ASSESSMENT DRILL SCORE BOARD -->
+    <div class="mt-6 bg-industrial-800/50 border border-industrial-700/60 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="text-xs text-slate-400 font-mono text-center sm:text-left">
+        <span class="text-white font-bold block sm:inline">Self Assessment:</span> Mark performance to track current session accuracy.
+      </div>
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <button onclick="recordScore(false)" class="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+          <i class="fa-solid fa-xmark"></i> Needs Review (<span id="countNeedsReview">0</span>)
+        </button>
+        <button onclick="recordScore(true)" class="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+          <i class="fa-solid fa-check"></i> Got It Right (<span id="countMastered">0</span>)
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-industrial-800 bg-industrial-900 py-4 text-center text-xs text-slate-500 font-mono">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div>Flashcard Reviewer • Modular Industrial Architecture</div>
+      <div class="flex items-center gap-4">
+        <span class="hover:text-slate-400 cursor-pointer text-emerald-400" onclick="openCardManagerModal()">+ Input Custom Cards</span>
+        <span>•</span>
+        <span class="hover:text-slate-400 cursor-pointer" onclick="openSettingsModal()">Backend Config</span>
+        <span>•</span>
+        <span class="hover:text-slate-400 cursor-pointer" onclick="openScriptGuideModal()">Google Apps Script Setup</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- CARD MANAGER MODAL (NEW) -->
+  <div id="cardManagerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-industrial-800 border border-industrial-700 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-industrial-700 flex items-center justify-between bg-industrial-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-emerald-400"></i> Manage Custom Cards & Decks
+        </h3>
+        <button onclick="closeCardManagerModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+        
+        <!-- Add New Card Form -->
+        <div class="bg-industrial-900/90 border border-industrial-700 rounded-xl p-4 space-y-4">
+          <h4 class="text-xs font-mono uppercase text-emerald-400 font-bold flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Add New Card
+          </h4>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-mono text-slate-400 mb-1">Term / Word *</label>
+              <input type="text" id="newWordInput" placeholder="e.g. Mitosis" class="w-full px-3 py-2 rounded-lg bg-industrial-800 border border-industrial-700 text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+              <label class="block text-[11px] font-mono text-slate-400 mb-1">Category / Tag</label>
+              <input type="text" id="newCategoryInput" placeholder="e.g. Biology" class="w-full px-3 py-2 rounded-lg bg-industrial-800 border border-industrial-700 text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-mono text-slate-400 mb-1">Definition / Meaning *</label>
+            <textarea id="newMeaningInput" rows="2" placeholder="e.g. Type of cell division that results in two identical daughter cells." class="w-full px-3 py-2 rounded-lg bg-industrial-800 border border-industrial-700 text-white text-xs font-sans focus:outline-none focus:border-emerald-500"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-mono text-slate-400 mb-1">Extra Context / Characteristics (Optional)</label>
+            <input type="text" id="newExtraInput" placeholder="e.g. Has 4 main stages: Prophase, Metaphase, Anaphase, Telophase." class="w-full px-3 py-2 rounded-lg bg-industrial-800 border border-industrial-700 text-white text-xs font-mono focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <div class="flex justify-end">
+            <button onclick="addCustomCard()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 transition">
+              <i class="fa-solid fa-plus"></i> Save Card
+            </button>
+          </div>
+        </div>
+
+        <!-- Current Custom Cards Table / List -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-mono uppercase text-slate-400 font-bold">Stored Flashcards (<span id="customCardCount">0</span>)</h4>
+            <div class="flex items-center gap-2">
+              <button onclick="exportDeckJSON()" class="px-2.5 py-1 rounded bg-industrial-700 hover:bg-industrial-600 text-slate-300 text-[11px] font-mono border border-industrial-600 flex items-center gap-1 transition">
+                <i class="fa-solid fa-download"></i> Export JSON
+              </button>
+              <button onclick="clearCustomCards()" class="px-2.5 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[11px] font-mono border border-rose-500/30 flex items-center gap-1 transition">
+                <i class="fa-solid fa-trash"></i> Clear All
+              </button>
+            </div>
+          </div>
+
+          <div id="customCardsList" class="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar">
+            <!-- Dynamic card rows will render here -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-industrial-700 bg-industrial-900 flex justify-between items-center">
+        <div class="text-[11px] text-slate-500 font-mono">Cards saved locally in browser storage</div>
+        <button onclick="closeCardManagerModal()" class="px-5 py-2 rounded-lg bg-industrial-accent text-white text-xs font-semibold hover:bg-blue-600 transition">
+          Done & Review Deck
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIGURATION & SETTINGS MODAL -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-industrial-800 border border-industrial-700 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-industrial-700 flex items-center justify-between bg-industrial-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-gear text-industrial-accent"></i> Data Source & Settings
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Modal Tabs & Body -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+        
+        <!-- Data Connection Type Selection -->
+        <div>
+          <label class="block text-xs font-mono uppercase text-slate-400 mb-2">Data Backend Source</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button id="srcTypeSheet" onclick="setSourceType('sheet')" class="p-3 border rounded-xl text-left font-semibold text-xs flex items-center gap-3 bg-industrial-700 border-industrial-accent text-white">
+              <i class="fa-solid fa-table-cells text-emerald-400 text-base"></i>
+              <div>
+                <div>Google Sheets API</div>
+                <div class="text-[10px] text-slate-400 font-normal">Live sync via Web App URL</div>
+              </div>
+            </button>
+
+            <button id="srcTypeCsv" onclick="setSourceType('local')" class="p-3 border rounded-xl text-left font-semibold text-xs flex items-center gap-3 bg-industrial-900 border-industrial-700 text-slate-400">
+              <i class="fa-solid fa-file-csv text-blue-400 text-base"></i>
+              <div>
+                <div>Local / CSV Data</div>
+                <div class="text-[10px] text-slate-400 font-normal">Standalone offline testing</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Google Sheet URL Configuration Block -->
+        <div id="sheetConfigSection" class="space-y-3">
+          <label class="block text-xs font-mono uppercase text-slate-400">Google Apps Script Executable URL</label>
+          <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-4 py-2.5 rounded-lg bg-industrial-900 border border-industrial-700 text-slate-200 text-xs font-mono focus:outline-none focus:border-industrial-accent transition">
+          <p class="text-[11px] text-slate-400">
+            Paste your Google Apps Script Web App Deployment URL here to connect directly with your spreadsheet.
+          </p>
+        </div>
+
+        <!-- Local CSV Input Block -->
+        <div id="localConfigSection" class="space-y-3 hidden">
+          <label class="block text-xs font-mono uppercase text-slate-400">Paste CSV or JSON Flashcard Data</label>
+          <textarea id="csvTextInput" rows="5" placeholder="Word, Meaning, Category, Extra Characteristics&#10;Photosynthesis, Process by which plants turn sunlight into energy, Biology, Requires Chlorophyll&#10;Mitosis, Cell division resulting in two daughter cells, Biology, 4 Stages" class="w-full px-4 py-2.5 rounded-lg bg-industrial-900 border border-industrial-700 text-slate-200 text-xs font-mono focus:outline-none focus:border-industrial-accent transition"></textarea>
+        </div>
+
+        <!-- App Script Guide Teaser -->
+        <div class="p-4 rounded-xl bg-industrial-900/80 border border-industrial-700/80 flex items-start gap-3">
+          <i class="fa-solid fa-code text-industrial-accent mt-0.5"></i>
+          <div class="text-xs">
+            <div class="font-bold text-slate-200 mb-1">Need the Google Apps Script code?</div>
+            <div class="text-slate-400">Copy the server-side code snippet required to publish your Google Sheet as a web API endpoint.</div>
+            <button onclick="openScriptGuideModal()" class="mt-2 text-industrial-accent hover:underline font-semibold font-mono text-[11px] flex items-center gap-1">
+              View Google Apps Script Code <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-industrial-700 bg-industrial-900 flex justify-end gap-3">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 rounded-lg bg-industrial-700 text-slate-300 text-xs font-semibold hover:bg-industrial-600 transition">
+          Cancel
+        </button>
+        <button onclick="saveSettings()" class="px-5 py-2 rounded-lg bg-industrial-accent text-white text-xs font-semibold hover:bg-blue-600 shadow-md transition">
+          Save & Load Deck
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- APPS SCRIPT GUIDE MODAL -->
+  <div id="scriptGuideModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-industrial-800 border border-industrial-700 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-industrial-700 flex items-center justify-between bg-industrial-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-brands fa-google text-emerald-400"></i> Google Apps Script Setup Guide
+        </h3>
+        <button onclick="closeScriptGuideModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Script Content & Instructions -->
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 custom-scrollbar text-xs">
+        <ol class="list-decimal list-inside space-y-2 text-slate-300 font-sans">
+          <li>Open your Google Sheet containing flashcard words & details.</li>
+          <li>Ensure Row 1 has headers: <code class="bg-industrial-900 px-1.5 py-0.5 rounded text-industrial-accent font-mono">Word</code>, <code class="bg-industrial-900 px-1.5 py-0.5 rounded text-industrial-accent font-mono">Meaning</code>, <code class="bg-industrial-900 px-1.5 py-0.5 rounded text-industrial-accent font-mono">Category</code>, <code class="bg-industrial-900 px-1.5 py-0.5 rounded text-industrial-accent font-mono">Characteristics</code>.</li>
+          <li>Click <strong class="text-white">Extensions</strong> &gt; <strong class="text-white">Apps Script</strong>.</li>
+          <li>Paste the code below into the code editor:</li>
+        </ol>
+
+        <!-- Script Code Box -->
+        <div class="relative">
+          <pre class="bg-industrial-900 p-4 rounded-xl border border-industrial-700 text-emerald-400 font-mono text-[11px] overflow-x-auto leading-relaxed">
+function doGet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var result = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (row[0]) { // skip empty rows
+      result.push({
+        word: row[0],
+        meaning: row[1] || "",
+        category: row[2] || "General",
+        extra: row[3] || ""
+      });
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+          <button onclick="copyAppsScriptCode()" class="absolute top-3 right-3 px-2.5 py-1 rounded bg-industrial-700 hover:bg-industrial-600 text-slate-200 text-[10px] font-mono border border-industrial-600 transition flex items-center gap-1">
+            <i class="fa-regular fa-copy"></i> Copy
+          </button>
+        </div>
+
+        <ol start="5" class="list-decimal list-inside space-y-2 text-slate-300 font-sans">
+          <li>Click <strong class="text-white">Deploy</strong> &gt; <strong class="text-white">New deployment</strong>.</li>
+          <li>Select type: <strong class="text-white">Web app</strong>. Set Executed as: <em>Me</em>, and Who has access: <em>Anyone</em>.</li>
+          <li>Copy the generated Web App URL and paste it into the Settings modal of this app!</li>
+        </ol>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-industrial-700 bg-industrial-900 flex justify-end">
+        <button onclick="closeScriptGuideModal()" class="px-4 py-2 rounded-lg bg-industrial-700 text-slate-300 text-xs font-semibold hover:bg-industrial-600 transition">
+          Close Guide
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- SYSTEM NOTIFICATION TOAST -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-industrial-800 border border-industrial-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 font-mono text-xs">
+      <i id="toastIcon" class="fa-solid fa-circle-info text-industrial-accent"></i>
+      <span id="toastMessage">Notification message</span>
+    </div>
+  </div>
+
+
+  <!-- APPLICATION JAVASCRIPT LOGIC -->
+  <script>
+    // --- SAMPLE DEFAULT DEMO DATASET ---
+    const DEMO_CARDS = [
+      {
+        word: "Mitochondria",
+        meaning: "The powerhouse of the cell responsible for generating chemical energy (ATP) through cellular respiration.",
+        category: "Biology",
+        extra: "Characteristics: Double-membrane bound organelle, contains its own DNA independent of the nucleus."
+      },
+      {
+        word: "Polymorphism",
+        meaning: "The ability of an object or method in Object-Oriented Programming to take on multiple structural forms.",
+        category: "Computer Science",
+        extra: "Types: Compile-time (Method Overloading) vs Run-time (Method Overriding)."
+      },
+      {
+        word: "Inflation",
+        meaning: "The general increase in prices and fall in the purchasing value of money over a given period of time.",
+        category: "Economics",
+        extra: "Key Metrics: Consumer Price Index (CPI), Producer Price Index (PPI)."
+      }
+    ];
+
+    // --- STATE MANAGEMENT VARIABLES ---
+    let localCustomCards = JSON.parse(localStorage.getItem('reviewer_custom_cards') || '[]');
+    let currentDeck = localCustomCards.length > 0 ? [...localCustomCards] : [...DEMO_CARDS];
+    let currentIndex = 0;
+    let isFlipped = false;
+    let studyMode = 'term-first'; // 'term-first' or 'def-first'
+    let sourceType = localCustomCards.length > 0 ? 'local' : 'demo'; 
+    let scriptUrl = localStorage.getItem('reviewer_script_url') || '';
+    
+    // Stats tracking
+    let masteredCount = 0;
+    let needsReviewCount = 0;
+
+    // --- INITIALIZATION ---
+    window.onload = function () {
+      if(scriptUrl) {
+        document.getElementById('scriptUrlInput').value = scriptUrl;
+      }
+      
+      document.addEventListener('keydown', handleKeyPress);
+      
+      if (localCustomCards.length > 0) {
+        document.getElementById('sourceLabel').innerText = "My Saved Deck";
+        document.getElementById('sourceIndicator').classList.remove('hidden');
+      }
+
+      renderCard();
+      renderCustomCardsList();
+    };
+
+    // --- CARD MANAGER LOGIC (LOCAL STORAGE INPUT) ---
+    function openCardManagerModal() {
+      renderCustomCardsList();
+      document.getElementById('cardManagerModal').classList.remove('hidden');
+    }
+
+    function closeCardManagerModal() {
+      document.getElementById('cardManagerModal').classList.add('hidden');
+    }
+
+    function addCustomCard() {
+      const word = document.getElementById('newWordInput').value.trim();
+      const meaning = document.getElementById('newMeaningInput').value.trim();
+      const category = document.getElementById('newCategoryInput').value.trim() || 'General';
+      const extra = document.getElementById('newExtraInput').value.trim();
+
+      if (!word || !meaning) {
+        showToast("Please enter both a Term and a Meaning", "warning");
+        return;
+      }
+
+      const newCard = { word, meaning, category, extra };
+      localCustomCards.push(newCard);
+      localStorage.setItem('reviewer_custom_cards', JSON.stringify(localCustomCards));
+
+      // Clear input fields
+      document.getElementById('newWordInput').value = '';
+      document.getElementById('newMeaningInput').value = '';
+      document.getElementById('newCategoryInput').value = '';
+      document.getElementById('newExtraInput').value = '';
+
+      // Switch current active deck to local custom deck
+      currentDeck = [...localCustomCards];
+      sourceType = 'local';
+      document.getElementById('sourceLabel').innerText = "My Saved Deck";
+      document.getElementById('sourceIndicator').classList.remove('hidden');
+
+      renderCustomCardsList();
+      renderCard();
+      showToast("New card added and saved!", "success");
+    }
+
+    function deleteCustomCard(index) {
+      localCustomCards.splice(index, 1);
+      localStorage.setItem('reviewer_custom_cards', JSON.stringify(localCustomCards));
+      
+      if (localCustomCards.length > 0) {
+        currentDeck = [...localCustomCards];
+      } else {
+        currentDeck = [...DEMO_CARDS];
+        document.getElementById('sourceLabel').innerText = "Demo Deck";
+      }
+      
+      if (currentIndex >= currentDeck.length) {
+        currentIndex = Math.max(0, currentDeck.length - 1);
+      }
+
+      renderCustomCardsList();
+      renderCard();
+      showToast("Card deleted");
+    }
+
+    function clearCustomCards() {
+      if (!confirm("Are you sure you want to delete all saved cards?")) return;
+      localCustomCards = [];
+      localStorage.removeItem('reviewer_custom_cards');
+      currentDeck = [...DEMO_CARDS];
+      currentIndex = 0;
+      document.getElementById('sourceLabel').innerText = "Demo Deck";
+
+      renderCustomCardsList();
+      renderCard();
+      showToast("All custom cards cleared. Resetting to Demo deck.");
+    }
+
+    function renderCustomCardsList() {
+      const container = document.getElementById('customCardsList');
+      document.getElementById('customCardCount').innerText = localCustomCards.length;
+
+      if (localCustomCards.length === 0) {
+        container.innerHTML = `<div class="text-center py-6 text-slate-500 text-xs italic">No custom cards added yet. Add your first card above!</div>`;
+        return;
+      }
+
+      container.innerHTML = localCustomCards.map((card, idx) => `
+        <div class="p-3 bg-industrial-900 rounded-lg border border-industrial-700/80 flex items-center justify-between gap-3 text-xs">
+          <div class="overflow-hidden">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white truncate">${escapeHtml(card.word)}</span>
+              <span class="px-1.5 py-0.5 rounded text-[10px] bg-industrial-700 text-slate-300 font-mono">${escapeHtml(card.category)}</span>
+            </div>
+            <p class="text-slate-400 text-[11px] truncate mt-0.5">${escapeHtml(card.meaning)}</p>
+          </div>
+          <button onclick="deleteCustomCard(${idx})" class="p-1.5 text-slate-500 hover:text-rose-400 transition" title="Delete card">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function exportDeckJSON() {
+      if (localCustomCards.length === 0) {
+        showToast("No custom cards to export", "warning");
+        return;
+      }
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(localCustomCards, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "my_flashcard_deck.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast("Exported JSON deck!", "success");
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    // --- RENDER FLASHCARD LOGIC ---
+    function renderCard() {
+      if (!currentDeck || currentDeck.length === 0) {
+        document.getElementById('cardFrontText').innerText = "No Cards Available";
+        document.getElementById('cardFrontSubtext').innerText = "Please add cards in Settings.";
+        document.getElementById('totalCardsCount').innerText = "0";
+        document.getElementById('currentCardIndex').innerText = "0";
+        return;
+      }
+
+      const card = currentDeck[currentIndex];
+      const frontCategory = document.getElementById('frontCategoryBadge');
+      const backCategory = document.getElementById('backCategoryBadge');
+      const frontText = document.getElementById('cardFrontText');
+      const frontSubtext = document.getElementById('cardFrontSubtext');
+      const backTitle = document.getElementById('cardBackTitle');
+      const backDescription = document.getElementById('cardBackDescription');
+      const backExtra = document.getElementById('cardBackExtra');
+
+      // Category update
+      frontCategory.innerText = card.category || 'General';
+      backCategory.innerText = (card.category || 'General') + ' • ANSWER';
+
+      // Mode-based display logic
+      if (studyMode === 'term-first') {
+        frontText.innerText = card.word;
+        frontSubtext.innerText = "Recite the definition & characteristics";
+        frontSubtext.classList.remove('hidden');
+
+        backTitle.innerText = card.word;
+        backDescription.innerText = card.meaning;
+      } else {
+        // Definition first mode
+        frontText.innerText = card.meaning;
+        frontSubtext.innerText = "Identify the term / concept name";
+        frontSubtext.classList.remove('hidden');
+
+        backTitle.innerText = card.word;
+        backDescription.innerText = "Definition: " + card.meaning;
+      }
+
+      // Extra Characteristics / Data block
+      if (card.extra && card.extra.trim() !== "") {
+        backExtra.innerText = card.extra;
+        backExtra.classList.remove('hidden');
+      } else {
+        backExtra.classList.add('hidden');
+      }
+
+      // Reset Card Flip State
+      resetFlipState();
+
+      // Update counters & progress bar
+      document.getElementById('currentCardIndex').innerText = currentIndex + 1;
+      document.getElementById('totalCardsCount').innerText = currentDeck.length;
+      
+      const progressPercent = ((currentIndex + 1) / currentDeck.length) * 100;
+      document.getElementById('progressBar').style.width = progressPercent + '%';
+    }
+
+    // --- CARD FLIP LOGIC ---
+    function flipCard() {
+      const cardEl = document.getElementById('flashcard');
+      isFlipped = !isFlipped;
+      if (isFlipped) {
+        cardEl.classList.add('rotate-y-180');
+      } else {
+        cardEl.classList.remove('rotate-y-180');
+      }
+    }
+
+    function resetFlipState() {
+      isFlipped = false;
+      document.getElementById('flashcard').classList.remove('rotate-y-180');
+    }
+
+    // --- DECK NAVIGATION ---
+    function nextCard() {
+      if (currentDeck.length === 0) return;
+      currentIndex = (currentIndex + 1) % currentDeck.length;
+      renderCard();
+    }
+
+    function prevCard() {
+      if (currentDeck.length === 0) return;
+      currentIndex = (currentIndex - 1 + currentDeck.length) % currentDeck.length;
+      renderCard();
+    }
+
+    function shuffleDeck() {
+      if (currentDeck.length <= 1) return;
+      
+      // Fisher-Yates shuffle
+      for (let i = currentDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentDeck[i], currentDeck[j]] = [currentDeck[j], currentDeck[i]];
+      }
+      
+      currentIndex = 0;
+      renderCard();
+      showToast("Deck shuffled successfully!");
+    }
+
+    // --- MODE SWITCHING ---
+    function setStudyMode(mode) {
+      studyMode = mode;
+      const termBtn = document.getElementById('modeTermFirstBtn');
+      const defBtn = document.getElementById('modeDefFirstBtn');
+
+      if (mode === 'term-first') {
+        termBtn.className = "flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-medium transition duration-150 bg-industrial-accent text-white shadow";
+        defBtn.className = "flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-medium transition duration-150 text-slate-400 hover:text-slate-200";
+      } else {
+        defBtn.className = "flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-medium transition duration-150 bg-industrial-accent text-white shadow";
+        termBtn.className = "flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-medium transition duration-150 text-slate-400 hover:text-slate-200";
+      }
+
+      renderCard();
+    }
+
+    // --- SELF ASSESSMENT TRACKING ---
+    function recordScore(isCorrect) {
+      if (isCorrect) {
+        masteredCount++;
+        document.getElementById('countMastered').innerText = masteredCount;
+        showToast("Marked as Got it Right!", "success");
+      } else {
+        needsReviewCount++;
+        document.getElementById('countNeedsReview').innerText = needsReviewCount;
+        showToast("Marked for Review", "warning");
+      }
+      
+      // Automatically advance to next card after scoring
+      setTimeout(() => {
+        nextCard();
+      }, 250);
+    }
+
+    function resetStats() {
+      masteredCount = 0;
+      needsReviewCount = 0;
+      document.getElementById('countMastered').innerText = "0";
+      document.getElementById('countNeedsReview').innerText = "0";
+      showToast("Session score reset");
+    }
+
+    // --- GOOGLE SHEETS / DATA FETCHING ---
+    async function fetchDeckData() {
+      const url = document.getElementById('scriptUrlInput').value.trim();
+      const syncIcon = document.getElementById('syncIcon');
+
+      if (!url) {
+        showToast("No Apps Script URL configured. Opening settings...", "warning");
+        openSettingsModal();
+        return;
+      }
+
+      syncIcon.classList.add('fa-spin');
+      showToast("Fetching cards from Google Sheets...");
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("HTTP error! Status: " + response.status);
+        
+        const data = await response.json();
+        
+        if (Array.isArray(data) && data.length > 0) {
+          currentDeck = data.map(item => ({
+            word: item.word || item.Word || "Untitled",
+            meaning: item.meaning || item.Meaning || item.definition || "No definition provided.",
+            category: item.category || item.Category || "General",
+            extra: item.extra || item.Extra || item.characteristics || item.Characteristics || ""
+          }));
+
+          currentIndex = 0;
+          sourceType = 'sheet';
+          document.getElementById('sourceLabel').innerText = "Google Sheets";
+          document.getElementById('sourceIndicator').classList.remove('hidden');
+          renderCard();
+          showToast(`Successfully loaded ${currentDeck.length} flashcards!`, "success");
+        } else {
+          showToast("Sheet returned empty or invalid data format.", "warning");
+        }
+      } catch (err) {
+        console.error("Sync Error:", err);
+        showToast("Failed to fetch Google Sheet data. Check CORS / Web App URL permissions.", "danger");
+      } finally {
+        syncIcon.classList.remove('fa-spin');
+      }
+    }
+
+    // --- LOCAL CSV PARSER ---
+    function parseCSVData(csvText) {
+      const lines = csvText.trim().split('\n');
+      if (lines.length === 0) return [];
+
+      const parsed = [];
+      const startIndex = lines[0].toLowerCase().includes('word') ? 1 : 0; // detect header row
+
+      for (let i = startIndex; i < lines.length; i++) {
+        const row = lines[i].split(',').map(cell => cell.trim());
+        if (row[0]) {
+          parsed.push({
+            word: row[0],
+            meaning: row[1] || "No definition",
+            category: row[2] || "General",
+            extra: row[3] || ""
+          });
+        }
+      }
+      return parsed;
+    }
+
+    // --- KEYBOARD CONTROLS ---
+    function handleKeyPress(e) {
+      // Prevent shortcut interference when typing inside text inputs
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          flipCard();
+          break;
+        case 'ArrowRight':
+          nextCard();
+          break;
+        case 'ArrowLeft':
+          prevCard();
+          break;
+        case 'Digit1':
+        case 'KeyN':
+          recordScore(false);
+          break;
+        case 'Digit2':
+        case 'KeyY':
+          recordScore(true);
+          break;
+      }
+    }
+
+    // --- MODAL & SETTINGS MANAGEMENT ---
+    function openSettingsModal() {
+      document.getElementById('settingsModal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    function openScriptGuideModal() {
+      document.getElementById('scriptGuideModal').classList.remove('hidden');
+    }
+
+    function closeScriptGuideModal() {
+      document.getElementById('scriptGuideModal').classList.add('hidden');
+    }
+
+    function setSourceType(type) {
+      sourceType = type;
+      const sheetBtn = document.getElementById('srcTypeSheet');
+      const csvBtn = document.getElementById('srcTypeCsv');
+      const sheetSec = document.getElementById('sheetConfigSection');
+      const localSec = document.getElementById('localConfigSection');
+
+      if (type === 'sheet') {
+        sheetBtn.className = "p-3 border rounded-xl text-left font-semibold text-xs flex items-center gap-3 bg-industrial-700 border-industrial-accent text-white";
+        csvBtn.className = "p-3 border rounded-xl text-left font-semibold text-xs flex items-center gap-3 bg-industrial-900 border-industrial-700 text-slate-400";
+        sheetSec.classList.remove('hidden');
+        localSec.classList.add('hidden');
+      } else {
+        csvBtn.className = "p-3 border rounded-xl text-left font-semibold text-xs flex items-center gap-3 bg-industrial-700 border-industrial-accent text-white";
+        sheetBtn.className = "p-3 border rounded-xl text-left font-semibold text-xs flex items-center gap-3 bg-industrial-900 border-industrial-700 text-slate-400";
+        localSec.classList.remove('hidden');
+        sheetSec.classList.add('hidden');
+      }
+    }
+
+    function saveSettings() {
+      const urlInput = document.getElementById('scriptUrlInput').value.trim();
+      const csvInput = document.getElementById('csvTextInput').value.trim();
+
+      if (urlInput) {
+        localStorage.setItem('reviewer_script_url', urlInput);
+        scriptUrl = urlInput;
+      }
+
+      if (sourceType === 'local' && csvInput) {
+        const localCards = parseCSVData(csvInput);
+        if (localCards.length > 0) {
+          currentDeck = localCards;
+          currentIndex = 0;
+          document.getElementById('sourceLabel').innerText = "Local CSV";
+          document.getElementById('sourceIndicator').classList.remove('hidden');
+          renderCard();
+          showToast(`Loaded ${localCards.length} cards from local data!`, "success");
+        } else {
+          showToast("Could not parse local data.", "warning");
+        }
+      } else if (sourceType === 'sheet' && urlInput) {
+        fetchDeckData();
+      }
+
+      closeSettingsModal();
+    }
+
+    function copyAppsScriptCode() {
+      const code = `function doGet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var result = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (row[0]) {
+      result.push({
+        word: row[0],
+        meaning: row[1] || "",
+        category: row[2] || "General",
+        extra: row[3] || ""
+      });
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+      const tempTextArea = document.createElement("textarea");
+      tempTextArea.value = code;
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(tempTextArea);
+      showToast("Google Apps Script snippet copied to clipboard!", "success");
+    }
+
+    // --- TOAST NOTIFICATIONS ---
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMessage');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.innerText = message;
+
+      if (type === 'success') {
+        toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
+      } else if (type === 'warning') {
+        toastIcon.className = "fa-solid fa-triangle-exclamation text-amber-400";
+      } else if (type === 'danger') {
+        toastIcon.className = "fa-solid fa-circle-xmark text-rose-400";
+      } else {
+        toastIcon.className = "fa-solid fa-circle-info text-industrial-accent";
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
